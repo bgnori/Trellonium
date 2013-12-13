@@ -9,9 +9,6 @@ pattern = re.compile(
     r"    (?P<method>[A-Z]+) /(?P<version>\d+)/boards/\[board_id\]/?(?P<entity>[^/]*)/?(?P<params>.*)")
 
 
-def empty():
-    return dict(GET={}, PUT={}, DELETE={}, POST={})
-
 class AppConnection:
     urlwversion= "https://api.trello.com/1/" 
     def __init__(self, key):
@@ -30,6 +27,20 @@ theApp = None
 class TrelloProxy:
     def __init__(self, idstr):
         self.idstr = idstr
+
+    @staticmethod
+    def build(methods):
+        availables = dict(GET={}, PUT={}, DELETE={}, POST={})
+        for line in methods.splitlines():
+            m = pattern.match(line)
+            if m:
+                d = m.groupdict()
+                xs = availables[d["method"]].get(d["entity"], None)
+                if xs is None:
+                    xs = []
+                xs.append(d["params"])
+                availables[d["method"]][d["entity"]] = xs
+        return availables
 
     def validate(self, method, path):
         return bool(self.availables[method][path])
@@ -103,16 +114,7 @@ class BoardProxy(TrelloProxy):
     DELETE /1/boards/[board_id]/members/[idMember]
     DELETE /1/boards/[board_id]/powerUps/[powerUp]"""
 
-    availables = empty()
-    for line in methods.splitlines():
-        m = pattern.match(line)
-        if m:
-            d = m.groupdict()
-            xs = availables[d["method"]].get(d["entity"], None)
-            if xs is None:
-                xs = []
-            xs.append(d["params"])
-            availables[d["method"]][d["entity"]] = xs
+    availables = TrelloProxy.build(methods) #FIXME
 
 
 theApp = AppConnection(file("appkey.txt", "r").read().strip())
