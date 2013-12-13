@@ -4,6 +4,8 @@ import re
 import requests
 import json
 
+from urllib import quote_plus
+
 source = "https://trello.com/docs/api/index.html"
 pattern = re.compile(
     r"    (?P<method>[A-Z]+) /(?P<version>\d+)/boards/\[board_id\]/?(?P<entity>[^/]*)/?(?P<params>.*)")
@@ -11,8 +13,20 @@ pattern = re.compile(
 
 class AppConnection:
     urlwversion= "https://api.trello.com/1/" 
-    def __init__(self, key):
+    def __init__(self, key, secret, token=None):
         self.key = key
+        self.secret = secret
+        self.token = token
+
+    def token_url(self, app_name, expiration='30days', write_access=True):
+        url = self.urlwversion + "/".join(["authorize"])
+        params = dict(key=self.key,
+                name=app_name,
+                expiration=expiration,
+                response_type="token",
+                scope='read,write' if write_access else 'read')
+        req = requests.Request(method='GET', url=url, params=params)
+        return req.full_url
 
     def GET(self, *paths): 
         def f(**kw):
@@ -22,11 +36,21 @@ class AppConnection:
             return json.loads(got.content)
         return f 
 
+    def POST(self, *paths): 
+        def f(**kw):
+            url = self.urlwversion + "/".join(paths)
+            params = dict(key=self.key, token=self.token, **kw)
+            got = requests.post(url, params=params)
+            return got
+            #return json.loads(got.content)
+        return f 
+
+
 theApp = None
 
 class TrelloProxy:
     def __init__(self, idstr):
-        self.idstr = idstr
+        self.__dict__["idstr"] = idstr
 
     @staticmethod
     def build(methods):
@@ -50,6 +74,14 @@ class TrelloProxy:
             return theApp.GET(self.__class__.path, self.idstr, path)
         else:
             raise
+
+    def __setattr__(self, path, value):
+        if self.validate("POST", path):
+            f = theApp.POST(self.__class__.path, self.idstr, path)
+            print f(**value)
+        else:
+            raise
+
 
 class BoardProxy(TrelloProxy):
     path = "boards"
@@ -116,11 +148,101 @@ class BoardProxy(TrelloProxy):
 
     availables = TrelloProxy.build(methods) #FIXME
 
+class CardProxy(TrelloProxy):
+    path = "cards"
+    methods = """
+    GET /1/cards/[card id or shortlink]
+    GET /1/cards/[card id or shortlink]/[field]
+    GET /1/cards/[card id or shortlink]/actions
+    GET /1/cards/[card id or shortlink]/attachments
+    GET /1/cards/[card id or shortlink]/attachments/[idAttachment]
+    GET /1/cards/[card id or shortlink]/board
+    GET /1/cards/[card id or shortlink]/board/[field]
+    GET /1/cards/[card id or shortlink]/checkItemStates
+    GET /1/cards/[card id or shortlink]/checklists
+    GET /1/cards/[card id or shortlink]/list
+    GET /1/cards/[card id or shortlink]/list/[field]
+    GET /1/cards/[card id or shortlink]/members
+    GET /1/cards/[card id or shortlink]/membersVoted
+    GET /1/cards/[card id or shortlink]/stickers
+    GET /1/cards/[card id or shortlink]/stickers/[idSticker]
+    PUT /1/cards/[card id or shortlink]
+    PUT /1/cards/[card id or shortlink]/actions/[idAction]/comments
+    PUT /1/cards/[card id or shortlink]/checklist/[idChecklist]/checkItem/[idCheckItem]/name
+    PUT /1/cards/[card id or shortlink]/checklist/[idChecklist]/checkItem/[idCheckItem]/pos
+    PUT /1/cards/[card id or shortlink]/checklist/[idChecklist]/checkItem/[idCheckItem]/state
+    PUT /1/cards/[card id or shortlink]/checklist/[idChecklistCurrent]/checkItem/[idCheckItem]
+    PUT /1/cards/[card id or shortlink]/closed
+    PUT /1/cards/[card id or shortlink]/desc
+    PUT /1/cards/[card id or shortlink]/due
+    PUT /1/cards/[card id or shortlink]/idAttachmentCover
+    PUT /1/cards/[card id or shortlink]/idBoard
+    PUT /1/cards/[card id or shortlink]/idList
+    PUT /1/cards/[card id or shortlink]/idMembers
+    PUT /1/cards/[card id or shortlink]/labels
+    PUT /1/cards/[card id or shortlink]/name
+    PUT /1/cards/[card id or shortlink]/pos
+    PUT /1/cards/[card id or shortlink]/stickers/[idSticker]
+    PUT /1/cards/[card id or shortlink]/subscribed
+    POST /1/cards
+    POST /1/cards/[card id or shortlink]/actions/comments
+    POST /1/cards/[card id or shortlink]/attachments
+    POST /1/cards/[card id or shortlink]/checklist/[idChecklist]/checkItem
+    POST /1/cards/[card id or shortlink]/checklist/[idChecklist]/checkItem/[idCheckItem]/convertToCard
+    POST /1/cards/[card id or shortlink]/checklists
+    POST /1/cards/[card id or shortlink]/idMembers
+    POST /1/cards/[card id or shortlink]/labels
+    POST /1/cards/[card id or shortlink]/markAssociatedNotificationsRead
+    POST /1/cards/[card id or shortlink]/membersVoted
+    POST /1/cards/[card id or shortlink]/stickers
+    DELETE /1/cards/[card id or shortlink]
+    DELETE /1/cards/[card id or shortlink]/actions/[idAction]/comments
+    DELETE /1/cards/[card id or shortlink]/attachments/[idAttachment]
+    DELETE /1/cards/[card id or shortlink]/checklist/[idChecklist]/checkItem/[idCheckItem]
+    DELETE /1/cards/[card id or shortlink]/checklists/[idChecklist]
+    DELETE /1/cards/[card id or shortlink]/idMembers/[idMember]
+    DELETE /1/cards/[card id or shortlink]/labels/[color]
+    DELETE /1/cards/[card id or shortlink]/membersVoted/[idMember]
+    DELETE /1/cards/[card id or shortlink]/stickers/[idSticker]
+    """
 
-theApp = AppConnection(file("appkey.txt", "r").read().strip())
+    @classmethod
+    def create_card(kls, **kw):
+        #idList, name, desc=None, pos=None, due=None,
+        #    labels=None, idMembers=None, idCardSource=None,
+        #    keepFromSource=None):
+        """
+    POST /1/cards
+Arguments
+    name (required)
+        Valid Values: a string with a length from 1 to 16384
+    desc (optional)
+        Valid Values: a string with a length from 0 to 16384
+    pos (optional)
+        Default: bottom
+        Valid Values: A position. top, bottom, or a positive number.
+    due (required)
+        Valid Values: A date, or null
+    labels (optional)
+    idList (required)
+        Valid Values: id of the list that the card should be added to
+    idMembers (optional)
+        Valid Values: A comma-separated list of objectIds, 24-character hex strings
+    idCardSource (optional)
+        Valid Values: The id of the card to copy into a new card.
+    keepFromSource (optional)
+        Default: all
+        Valid Values: Properties of the card to copy over from the source.
+        """
+        f = theApp.POST(kls.path)
+        return f(**kw)
+    
 
-b = BoardProxy("52a113d948daf8a31e0043dd")
-#print b.memnbers
-#print b.members
-print b.lists()
+def init(keyfile, secretfile):
+    global theApp
+    with file(keyfile, "r") as f:
+        with file(secretfile, "r") as g:
+            theApp = AppConnection(f.read().strip(), g.read().strip())
+
+
 
