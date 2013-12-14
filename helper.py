@@ -9,6 +9,4 @@ app.token = file("/home/nori/Desktop/work/Trellonium/token.txt").read().split()
 
 theBoard = model.BoardProxy("52a113d948daf8a31e0043dd")
 xs = theBoard.lists()
-theList = xs[0]
-theCard = xs[0].cards()[0]
 

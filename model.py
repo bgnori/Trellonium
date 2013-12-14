@@ -122,6 +122,11 @@ class TrelloProxy:
 
 class BoardProxy(TrelloProxy):
     path = "boards"
+    fields = set(["name", "desc", "descData", "closed", "idOrganization",
+        "invited", "pinned", "url", "prefs", "invitations", "memberships",
+        "shortLink", "subscribed", "labelNames", "powerUps", "dateLastActivity",
+        "dateLastView", "shortUrl"])
+
     methods = """
     GET /1/boards/[board_id]
     GET /1/boards/[board_id]/[field]
@@ -289,6 +294,7 @@ TrelloProxy.register(CardProxy)
 
 class CheckListProxy(TrelloProxy):
     path = "checklists"
+    fields = set(["name", "idBoard", "idCard", "pos"])
     methods = """
     GET /1/checklists/[idChecklist]
     GET /1/checklists/[idChecklist]/[field]
@@ -314,6 +320,7 @@ TrelloProxy.register(CheckListProxy)
 
 class ListProxy(TrelloProxy):
     path = "lists"
+    fields = set(["name", "closed", "idCard", "pos", "subscribed"])
     methods = """
     GET /1/lists/[idList]
     GET /1/lists/[idList]/[field]
@@ -339,6 +346,13 @@ TrelloProxy.register(ListProxy)
 
 class MemberProxy(TrelloProxy):
     path = "members"
+    fields = set(["avatarHash", "bio", "bioData", "confirmed",
+        "fullName", "idPremOrgsAdmin", "initials", "memberType",
+        "products", "status", "url", "username", "avatarSource",
+        "email", "gravatarHash", "idBoards", "idBoardsInvited",
+        "idBoardsPinned", "idOrganizations", "idOrganizationsInvited",
+        "loginTypes", "newEmail", "oneTimeMessagesDismissed", "prefs",
+        "status", "trophies", "uploadedAvatarHash", "premiumFeatures"])
     methods = """
     GET /1/members/[idMember or username]
     GET /1/members/[idMember or username]/[field]
