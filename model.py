@@ -51,24 +51,22 @@ class AppConnection:
             url = self.urlwversion + "/".join(paths)
             params = dict(key=self.key, token=self.token, value=value)
             got = requests.put(url, params=params)
-            print got
-            print got.content
-            return got
-            #return json.loads(got.content)
+            return json.loads(got.content)
         return f
 
 
 theApp = None
 
-def json2proxy(xs, kls):
-    return [kls(x) for x in xs]
-
 
 class TrelloProxy:
     fields = set([])
+    knowns = {}
 
     def __init__(self, idstr):
         self.__dict__["idstr"] = idstr
+
+    def __repr__(self):
+        return "(%s, %s)"%(self.__class__.__name__, self.idstr)
 
     @staticmethod
     def build(methods):
@@ -84,6 +82,10 @@ class TrelloProxy:
                 rs[d["method"]][d["entity"]] = xs
         return rs
 
+    @classmethod
+    def register(kls, subk):
+        kls.knowns[subk.path] = subk
+
     def validate(self, method, path):
         m = self.availables[method]
         try:
@@ -95,6 +97,11 @@ class TrelloProxy:
 
     def __getattr__(self, path):
         if self.validate("GET", path):
+            if path in self.knowns:
+                def foo(**kw):
+                    f = theApp.GET(self.__class__.path, self.idstr, path)
+                    return [self.knowns[path](x['id']) for x in f(**kw)]
+                return foo
             return theApp.GET(self.__class__.path, self.idstr, path)
         elif '[field]' in self.availables["GET"]:
             if path in self.fields:
@@ -178,6 +185,7 @@ class BoardProxy(TrelloProxy):
 
     availables = TrelloProxy.build(methods) #FIXME
 
+TrelloProxy.register(BoardProxy)
 
 
 class CardProxy(TrelloProxy):
@@ -275,7 +283,9 @@ Arguments
         """
         f = theApp.POST(kls.path)
         return f(**kw)
-  
+
+TrelloProxy.register(CardProxy)
+
 
 class CheckListProxy(TrelloProxy):
     path = "checklists"
@@ -299,6 +309,8 @@ class CheckListProxy(TrelloProxy):
     """
     availables = TrelloProxy.build(methods) #FIXME
 
+TrelloProxy.register(CheckListProxy)
+
 
 class ListProxy(TrelloProxy):
     path = "lists"
@@ -321,6 +333,8 @@ class ListProxy(TrelloProxy):
     POST /1/lists/[idList]/cards
     """
     availables = TrelloProxy.build(methods) #FIXME
+
+TrelloProxy.register(ListProxy)
 
 
 class MemberProxy(TrelloProxy):
@@ -379,6 +393,8 @@ class MemberProxy(TrelloProxy):
     DELETE /1/members/[idMember or username]/idBoardsPinned/[idBoard]
     """
     availables = TrelloProxy.build(methods) #FIXME
+
+TrelloProxy.register(MemberProxy)
 
 
 def init(keyfile, secretfile):
