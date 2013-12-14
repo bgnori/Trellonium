@@ -8,11 +8,12 @@ from urllib import quote_plus
 
 source = "https://trello.com/docs/api/index.html"
 pattern = re.compile(
-    r"    (?P<method>[A-Z]+) /(?P<version>\d+)/boards/\[board_id\]/?(?P<entity>[^/]*)/?(?P<params>.*)")
+    r"    (?P<method>[A-Z]+) /(?P<version>\d+)/(?P<object_name>\w+)/(?P<object_id>\[[^]]+\])/?(?P<entity>[^/]*)/?(?P<params>.*)")
+
 
 
 class AppConnection:
-    urlwversion= "https://api.trello.com/1/" 
+    urlwversion= "https://api.trello.com/1/"
     def __init__(self, key, secret, token=None):
         self.key = key
         self.secret = secret
@@ -28,59 +29,88 @@ class AppConnection:
         req = requests.Request(method='GET', url=url, params=params)
         return req.full_url
 
-    def GET(self, *paths): 
+    def GET(self, *paths):
         def f(**kw):
             url = self.urlwversion + "/".join(paths)
             params = dict(key=self.key, **kw)
             got = requests.get(url, params=params)
             return json.loads(got.content)
-        return f 
+        return f
 
-    def POST(self, *paths): 
+    def POST(self, *paths):
         def f(**kw):
             url = self.urlwversion + "/".join(paths)
             params = dict(key=self.key, token=self.token, **kw)
             got = requests.post(url, params=params)
             return got
             #return json.loads(got.content)
-        return f 
+        return f
+
+    def PUT(self, *paths):
+        def f(value):
+            url = self.urlwversion + "/".join(paths)
+            params = dict(key=self.key, token=self.token, value=value)
+            got = requests.put(url, params=params)
+            print got
+            print got.content
+            return got
+            #return json.loads(got.content)
+        return f
 
 
 theApp = None
 
+def json2proxy(xs, kls):
+    return [kls(x) for x in xs]
+
+
 class TrelloProxy:
+    fields = set([])
+
     def __init__(self, idstr):
         self.__dict__["idstr"] = idstr
 
     @staticmethod
     def build(methods):
-        availables = dict(GET={}, PUT={}, DELETE={}, POST={})
+        rs = dict(GET={}, PUT={}, DELETE={}, POST={})
         for line in methods.splitlines():
             m = pattern.match(line)
             if m:
                 d = m.groupdict()
-                xs = availables[d["method"]].get(d["entity"], None)
+                xs = rs[d["method"]].get(d["entity"], None)
                 if xs is None:
                     xs = []
                 xs.append(d["params"])
-                availables[d["method"]][d["entity"]] = xs
-        return availables
+                rs[d["method"]][d["entity"]] = xs
+        return rs
 
     def validate(self, method, path):
-        return bool(self.availables[method][path])
+        m = self.availables[method]
+        try:
+            return path in m
+        except:
+            if '[field]' not in m:
+                return False
+            return path in self.fields
 
     def __getattr__(self, path):
         if self.validate("GET", path):
             return theApp.GET(self.__class__.path, self.idstr, path)
-        else:
-            raise
+        elif '[field]' in self.availables["GET"]:
+            if path in self.fields:
+                return theApp.GET(self.__class__.path, self.idstr, path)
+            else:
+                raise
 
     def __setattr__(self, path, value):
-        if self.validate("POST", path):
-            f = theApp.POST(self.__class__.path, self.idstr, path)
-            print f(**value)
-        else:
-            raise
+        if self.validate("PUT", path):
+            f = theApp.PUT(self.__class__.path, self.idstr, path)
+            print f(value)
+        elif '[field]' in self.availables["PUT"]:
+            if path in self.fields:
+                return theApp.PUT(self.__class__.path, self.idstr, path)
+            else:
+                raise
 
 
 class BoardProxy(TrelloProxy):
@@ -148,6 +178,8 @@ class BoardProxy(TrelloProxy):
 
     availables = TrelloProxy.build(methods) #FIXME
 
+
+
 class CardProxy(TrelloProxy):
     path = "cards"
     methods = """
@@ -206,6 +238,13 @@ class CardProxy(TrelloProxy):
     DELETE /1/cards/[card id or shortlink]/stickers/[idSticker]
     """
 
+    availables = TrelloProxy.build(methods) #FIXME
+    fields = set(["badges", "checkItemStates", "closed", "dateLastActivity",
+        "desc", "descData", "due", "idBoard", "idChecklists", "idList",
+        "idMembers", "idMembersVoted", "idShort", "idAttachmentCover",
+        "manualCoverAttachment", "labels", "name", "pos", "shortLink",
+        "shortUrl", "subscribed", "url",])
+
     @classmethod
     def create_card(kls, **kw):
         #idList, name, desc=None, pos=None, due=None,
@@ -236,7 +275,111 @@ Arguments
         """
         f = theApp.POST(kls.path)
         return f(**kw)
-    
+  
+
+class CheckListProxy(TrelloProxy):
+    path = "checklists"
+    methods = """
+    GET /1/checklists/[idChecklist]
+    GET /1/checklists/[idChecklist]/[field]
+    GET /1/checklists/[idChecklist]/board
+    GET /1/checklists/[idChecklist]/board/[field]
+    GET /1/checklists/[idChecklist]/cards
+    GET /1/checklists/[idChecklist]/cards/[filter]
+    GET /1/checklists/[idChecklist]/checkItems
+    GET /1/checklists/[idChecklist]/checkItems/[idCheckItem]
+    PUT /1/checklists/[idChecklist]
+    PUT /1/checklists/[idChecklist]/idCard
+    PUT /1/checklists/[idChecklist]/name
+    PUT /1/checklists/[idChecklist]/pos
+    POST /1/checklists
+    POST /1/checklists/[idChecklist]/checkItems
+    DELETE /1/checklists/[idChecklist]
+    DELETE /1/checklists/[idChecklist]/checkItems/[idCheckItem]
+    """
+    availables = TrelloProxy.build(methods) #FIXME
+
+
+class ListProxy(TrelloProxy):
+    path = "lists"
+    methods = """
+    GET /1/lists/[idList]
+    GET /1/lists/[idList]/[field]
+    GET /1/lists/[idList]/actions
+    GET /1/lists/[idList]/board
+    GET /1/lists/[idList]/board/[field]
+    GET /1/lists/[idList]/cards
+    GET /1/lists/[idList]/cards/[filter]
+    PUT /1/lists/[idList]
+    PUT /1/lists/[idList]/closed
+    PUT /1/lists/[idList]/idBoard
+    PUT /1/lists/[idList]/name
+    PUT /1/lists/[idList]/pos
+    PUT /1/lists/[idList]/subscribed
+    POST /1/lists
+    POST /1/lists/[idList]/archiveAllCards
+    POST /1/lists/[idList]/cards
+    """
+    availables = TrelloProxy.build(methods) #FIXME
+
+
+class MemberProxy(TrelloProxy):
+    path = "members"
+    methods = """
+    GET /1/members/[idMember or username]
+    GET /1/members/[idMember or username]/[field]
+    GET /1/members/[idMember or username]/actions
+    GET /1/members/[idMember or username]/boardBackgrounds
+    GET /1/members/[idMember or username]/boardBackgrounds/[idBoardBackground]
+    GET /1/members/[idMember or username]/boardStars
+    GET /1/members/[idMember or username]/boards
+    GET /1/members/[idMember or username]/boards/[filter]
+    GET /1/members/[idMember or username]/boardsInvited
+    GET /1/members/[idMember or username]/boardsInvited/[field]
+    GET /1/members/[idMember or username]/cards
+    GET /1/members/[idMember or username]/cards/[filter]
+    GET /1/members/[idMember or username]/customBoardBackgrounds
+    GET /1/members/[idMember or username]/customBoardBackgrounds/[idBoardBackground]
+    GET /1/members/[idMember or username]/customEmoji
+    GET /1/members/[idMember or username]/customEmoji/[idCustomEmoji]
+    GET /1/members/[idMember or username]/customStickers
+    GET /1/members/[idMember or username]/customStickers/[idCustomSticker]
+    GET /1/members/[idMember or username]/notifications
+    GET /1/members/[idMember or username]/notifications/[filter]
+    GET /1/members/[idMember or username]/organizations
+    GET /1/members/[idMember or username]/organizations/[filter]
+    GET /1/members/[idMember or username]/organizationsInvited
+    GET /1/members/[idMember or username]/organizationsInvited/[field]
+    GET /1/members/[idMember or username]/sessions
+    GET /1/members/[idMember or username]/tokens
+    PUT /1/members/[idMember or username]
+    PUT /1/members/[idMember or username]/avatarSource
+    PUT /1/members/[idMember or username]/bio
+    PUT /1/members/[idMember or username]/boardBackgrounds/[idBoardBackground]
+    PUT /1/members/[idMember or username]/boardStars/[idBoardStar]
+    PUT /1/members/[idMember or username]/customBoardBackgrounds/[idBoardBackground]
+    PUT /1/members/[idMember or username]/fullName
+    PUT /1/members/[idMember or username]/initials
+    PUT /1/members/[idMember or username]/prefs/colorBlind
+    PUT /1/members/[idMember or username]/prefs/minutesBetweenSummaries
+    PUT /1/members/[idMember or username]/username
+    POST /1/members/[idMember or username]/avatar
+    POST /1/members/[idMember or username]/boardBackgrounds
+    POST /1/members/[idMember or username]/boardStars
+    POST /1/members/[idMember or username]/customBoardBackgrounds
+    POST /1/members/[idMember or username]/customEmoji
+    POST /1/members/[idMember or username]/customStickers
+    POST /1/members/[idMember or username]/idBoardsPinned
+    POST /1/members/[idMember or username]/oneTimeMessagesDismissed
+    POST /1/members/[idMember or username]/unpaidAccount
+    DELETE /1/members/[idMember or username]/boardBackgrounds/[idBoardBackground]
+    DELETE /1/members/[idMember or username]/boardStars/[idBoardStar]
+    DELETE /1/members/[idMember or username]/customBoardBackgrounds/[idBoardBackground]
+    DELETE /1/members/[idMember or username]/customStickers/[idCustomSticker]
+    DELETE /1/members/[idMember or username]/idBoardsPinned/[idBoard]
+    """
+    availables = TrelloProxy.build(methods) #FIXME
+
 
 def init(keyfile, secretfile):
     global theApp
