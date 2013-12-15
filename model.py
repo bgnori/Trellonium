@@ -58,7 +58,7 @@ class AppConnection:
 theApp = None
 
 
-class TrelloProxy:
+class TrelloProxy(object):
     fields = set([])
     knowns = {}
 
