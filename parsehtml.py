@@ -4,16 +4,7 @@ import os.path
 
 from lxml import etree
 
-
-dirname = "fromRef"
-objnames = ["action", "board", "card", "checklist", "member", "notification", "organaization", "search", "token", "type", "webhook", ]
-
-
-keywords = {
-        "Required permissions:": None,
-        "Arguments": None,
-        "Valid Values:": None,
-        }
+from commons import objnames, dirname
 
 def handle_argument(node):
     print node.xpath('tt/span[@class="pre"]/text()')[0]

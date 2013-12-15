@@ -4,11 +4,9 @@ import os.path
 
 import requests
 
+from commons import objnames, dirname
+
 source = "https://trello.com/docs/api/"
-
-dirname = "fromRef"
-
-objnames = ["action", "board", "card", "checklist", "member", "notification", "organaization", "search", "token", "type", "webhook", ]
 
 
 for name in objnames:
