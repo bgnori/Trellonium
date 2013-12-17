@@ -75,12 +75,16 @@ class TrelloProxy(object):
             m = pattern.match(line)
             if m:
                 d = m.groupdict()
-                xs = rs[d["method"]].get(d["entity"], None)
-                if xs is None:
-                    xs = []
-                xs.append(d["params"])
-                rs[d["method"]][d["entity"]] = xs
+                TrelloProxy._buildone(rs, d)
         return rs
+
+    @staticmethod
+    def _buildone(rs, d):
+        xs = rs[d["method"]].get(d["entity"], None)
+        if xs is None:
+            xs = []
+        xs.append(d["params"])
+        rs[d["method"]][d["entity"]] = xs
 
     @classmethod
     def register(kls, subk):
