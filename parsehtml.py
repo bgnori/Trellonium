@@ -12,33 +12,47 @@ class Handler(object):
         self.name = name
 
     def handle(self, t):
-        self.handle_root(t)
+        for found in self.handle_root(t):
+            print found
 
     def handle_root(self, t):
-        print t
         for n in t.xpath("//div[@id=$id]/div", id=self.name):
-            print n
-            self.handle_node(n)
+            yield self.handle_node(n)
 
     def handle_node(self, node):
-        print "id:", node.attrib['id']
+        d = {}
+        d["id"] = node.attrib['id']
         for s in node.xpath("h2"):
-            print "method:", s.text
+            d["method"] = s.text
         for s in node.xpath("h2/span"):
-            print "path:", s.text
+            d["path_text"] = s.text
         for m in node.xpath('ul/li[strong/text()="Required permissions:"]/text()'):
-            print 'permissions:', m
-        for m in node.xpath('ul/li[strong/text()="Arguments"]/ul/li'):
-            self.handle_argument(m)
+            d["permission_text"] = m
+        for m in node.xpath('ul/li[strong/text()="Arguments"]'):
+            d["argument"] = self.handle_argument(m)
         #for m in n.xpath("ul/li/ul/li"):
         #    print m.text
+        print d
+        return d
 
     def handle_argument(self, node):
-        print node.xpath('tt/span[@class="pre"]/text()')[0]
-        xs = node.xpath('ul/li[strong/text()="Valid Values:"]/ul/li/tt/span/text()')
-        if not xs:
-            xs = ['descriptive'] + node.xpath('ul/li[strong/text()="Valid Values:"]/text()')
-        print xs
+        argspec = {}
+        for p in node.xpath('ul/li[tt/span[@class="pre"]]'):
+            paramspec = self.handle_param(p)
+            argspec[paramspec["name"]] = paramspec
+        return argspec
+
+    def handle_param(self, node):
+        d = {}
+        d["name"] = node.xpath('tt/span/text()')[0]
+        d["op_text"] = node.xpath('tt/following-sibling::text()[1]')[0]
+        d["is_required"] = d["op_text"].strip(" ()") == "required"
+        d["is_optional"] = d["op_text"].strip(" ()") == "optional"
+        d["default"] = node.xpath('ul/li[strong/text()="Default:"]/text()')
+        d["vv"] = set(node.xpath('ul/li[strong/text()="Valid Values:"]/ul/li/tt/span/text()'))
+        d["description"] = text = node.xpath('ul/li[strong/text()="Valid Values:"]/text()')
+        return d
+
 
 
 def process(name):
@@ -48,7 +62,10 @@ def process(name):
         t = etree.parse(f, p)
         h.handle(t)
 
-for name in objnames:
-    pass
 
-process("card")
+if __name__  == "__main__":
+    process("card")
+    
+    for name in objnames:
+        pass
+
