@@ -2,15 +2,16 @@
 
 dirname = "fromRef"
 objnames = {
-    "action": "ActionProxy",
-    "board": "BoardProxy",
-    "card": "CardProxy",
-    "checklist": "CheckListProxy",
-    "member": "MemberProxy",
-    "notification": "NotificationProxy",
-    "organaization": "OrganazationProxy",
-    "search": "SearchProxy",
-    "token": "TokenProxy",
-    "type": "TyepeProxy",
-    "webhook": "WebhookProxy"}
+    #name and path
+    "action": "actions",
+    "board": "boards",
+    "card": "cards",
+    "checklist": "checklists",
+    "member": "members",
+    "notification": "notifications",
+    "organaization": "organaizations",
+    "search": "search",
+    "token": "tokens",
+    "type": "types",
+    "webhook": "webhooks"}
 
