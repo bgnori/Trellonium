@@ -5,6 +5,8 @@ import os.path
 from lxml import etree
 
 from commons import objnames, dirname
+from pathspec import PathSpec
+
 
 
 class Handler(object):
@@ -22,9 +24,11 @@ class Handler(object):
         d = {}
         d["id"] = node.attrib['id']
         for s in node.xpath("h2"):
-            d["method"] = s.text
+            d["method"] = s.text.strip()
         for s in node.xpath("h2/span"):
-            d["path_text"] = s.text
+            path = PathSpec(s.text)
+            d["path"] = path
+            d["prop_name"] = path.prop_name
         for m in node.xpath('ul/li[strong/text()="Required permissions:"]/text()'):
             d["permission_text"] = m
         for m in node.xpath('ul/li[strong/text()="Arguments"]'):
@@ -60,12 +64,14 @@ def process(name):
 
 
 if __name__  == "__main__":
-    for found in process("board"):
+    import sys
+    p = process(sys.argv[1])
+    for found in p:
         print found['id']
+        print found['path']
+        print found['path'].realize(field='abc', idBoard='123')
         if 'Arguments' in found:
             for k, v in found['Arguments'].iteritems():
                 print '   ', k, v
-    
-    for name in objnames:
-        pass
+
 
