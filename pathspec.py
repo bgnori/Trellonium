@@ -42,7 +42,7 @@ class PathSpec(object):
             self.frags.append(y)
 
     def __hash__(self):
-        return hash(self.method_name)
+        return hash(self.function_name)
 
     def __repr__(self):
         return "<PathSpec %s>"%(self.path_text)
@@ -51,7 +51,7 @@ class PathSpec(object):
         return "/".join(frag.realize(**kw) for frag in self.frags)
 
     @property
-    def method_name(self):
+    def function_name(self):
         return self.frags[4].realize()
 
 
