@@ -20,8 +20,12 @@ class PathFragVariable(PathFrag):
         for x in re.split(' or ', t.strip('[]')):
             y = re.split('[ _]', x)
             if 'id' in y:
-                assert len(y) == 2
-                y = [y[1], y[0].capitalize()]
+                if len(y) == 1:
+                    pass
+                elif len(y) == 2:
+                    y = [y[1], y[0].capitalize()]
+                else:
+                    raise
             self.ts.append(''.join(y))
 
     def __repr__(self):
@@ -41,7 +45,11 @@ class PathSpec(object):
         self.frags = []
         for x in xs:
             if x.startswith('['):
-                y = PathFragVariable(x)
+                try:
+                    y = PathFragVariable(x)
+                except:
+                    print path_text
+                    raise
             else:
                 y = PathFragText(x)
             self.frags.append(y)
