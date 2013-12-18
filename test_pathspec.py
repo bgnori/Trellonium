@@ -26,7 +26,7 @@ class TestPathSpec(unittest.TestCase):
         self.ps1 = pathspec.PathSpec("/1/boards/[board_id]/members/[idMember]")
 
     def test_hash(self):
-        self.assertEqual(hash(self.path), hash(self.ps))
+        self.assertEqual(hash("cards"), hash(self.ps))
 
     def test_realize(self):
         self.assertEqual('/1/boards/123/cards', self.ps.realize(idBoard='123'))
