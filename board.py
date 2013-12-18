@@ -3,6 +3,7 @@
 from commons import objnames, dirname
 from model import TrelloProxy
 
+from parsehtml import process
 
 klassfields = dict(
     path = "boards",
