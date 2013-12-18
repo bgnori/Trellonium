@@ -6,9 +6,8 @@ import json
 
 from urllib import quote_plus
 
-source = "https://trello.com/docs/api/index.html"
-pattern = re.compile(
-    r"    (?P<method>[A-Z]+) /(?P<version>\d+)/(?P<object_name>\w+)/(?P<object_id>\[[^]]+\])/?(?P<entity>[^/]*)/?(?P<params>.*)")
+from commons import objnames
+from parsehtml import process
 
 
 
@@ -60,7 +59,8 @@ theApp = None
 
 class TrelloProxy(object):
     fields = set([])
-    knowns = {}
+    _by_name = {}
+    _by_path = {}
 
     def __init__(self, idstr):
         self.__dict__["idstr"] = idstr
@@ -69,13 +69,10 @@ class TrelloProxy(object):
         return "(%s, %s)"%(self.__class__.__name__, self.idstr)
 
     @staticmethod
-    def build(methods):
+    def build(source):
         rs = dict(GET={}, PUT={}, DELETE={}, POST={})
-        for line in methods.splitlines():
-            m = pattern.match(line)
-            if m:
-                d = m.groupdict()
-                TrelloProxy._buildone(rs, d)
+        for s in source:
+            self.buildone(rs, s)
         return rs
 
     @staticmethod
@@ -88,14 +85,23 @@ class TrelloProxy(object):
 
     @classmethod
     def register(kls, subk):
-        kls.knowns[subk.path] = subk
+        kls._by_name[subk.name] = subk
+        kls._by_path[subk.path] = subk
+
+    @classmethod
+    def find_by_name(kls, name):
+        return kls._by_name[name]
+
+    @classmethod
+    def find_by_path(kls, path):
+        return kls._by_path[subk.path]
 
     @classmethod
     def create(kls, **kw):
         f = theApp.POST(kls.path)
         got = f(**kw)
         x = json.loads(got.content)
-        return kls.knowns[kls.path](x['id']) 
+        return kls(x['id'])  #FIXME Need to cache other fields.
 
     def validate(self, method, path):
         m = self.availables[method]
@@ -108,17 +114,15 @@ class TrelloProxy(object):
 
     def __getattr__(self, path):
         if self.validate("GET", path):
-            if path in self.knowns:
-                def foo(**kw):
-                    f = theApp.GET(self.__class__.path, self.idstr, path)
-                    return [self.knowns[path](x['id']) for x in f(**kw)]
-                return foo
-            return theApp.GET(self.__class__.path, self.idstr, path)
+            def foo(**kw):
+                f = theApp.GET(self.__class__.path, self.idstr, path)
+                return [self.find_by_path(path)(x['id']) for x in f(**kw)]
+            return foo
         elif '[field]' in self.availables["GET"]:
             if path in self.fields:
                 return theApp.GET(self.__class__.path, self.idstr, path)
             else:
-                raise
+                raise "Bad Field %s for %s "%(path, self.__klass__)
 
     def __setattr__(self, path, value):
         if self.validate("PUT", path):
@@ -137,6 +141,17 @@ def init(keyfile, secretfile):
     with file(keyfile, "r") as f:
         with file(secretfile, "r") as g:
             theApp = AppConnection(f.read().strip(), g.read().strip())
+
+    for name, path in objnames.items():
+        p = type(name, (TrelloProxy, ), dict(path=path, name=name))
+        TrelloProxy.register(p)
+
+if __name__  == "__main__":
+    init("/home/nori/Desktop/work/Trellonium/appkey.txt", "/home/nori/Desktop/work/Trellonium/secret.txt")
+    theApp.token = file("/home/nori/Desktop/work/Trellonium/token.txt").read().split()
+    theBoard = TrelloProxy.find_by_name("board")("52a113d948daf8a31e0043dd")
+    print theBoard
+
 
 
 
