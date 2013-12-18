@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import sys
 import re
 import requests
 import json
@@ -87,8 +88,8 @@ class TrelloProxy(object):
 
     @classmethod
     def register(kls, subk):
-        kls._by_name[subk.name] = subk
-        kls._by_path[subk.path] = subk
+        kls._by_name[subk._name] = subk
+        kls._by_path[subk._path] = subk
 
     @classmethod
     def find_by_name(kls, name):
@@ -96,15 +97,12 @@ class TrelloProxy(object):
 
     @classmethod
     def find_by_path(kls, path):
-        print path
-        print kls._by_path
         return kls._by_path[path]
 
     @classmethod
     def nice(kls, txt, x):
         try:
             k = kls.find_by_path(txt)
-            print k
             return k(x['id'])
         except KeyError:
             return x
@@ -116,29 +114,37 @@ class TrelloProxy(object):
         x = json.loads(got.content)
         return kls(x['id'])  #FIXME Need to cache other fields.
 
-    def find(self, method, prop):
+    def find_func(self, method, prop):
         m = self.availables[method]
-        xs = m.get(prop, None)
-        if xs:
-            return xs
-        if '[field]' in m:
-            return m['[field]'].get(prop, None)
-        return None
+        return m.get(prop, None)
+
+    def find_field(self, method, prop):
+        m = self.availables[method]
+        return m.get('[field]', None)
 
     def prepare_param(self):
         d = {}
-        d['id' + self.name.capitalize()] = self.idstr
+        d['id' + self._name.capitalize()] = self.idstr
         return d
 
     def __getattr__(self, prop):
-        found = self.find("GET", prop)
+        found = self.find_func("GET", prop)
         if found:
             shortest = min(found, key=lambda x: len(x['path'].frags))
-            print shortest
             param = self.prepare_param()
             def foo(**kw):
                 f = theApp.GET(shortest["path"].realize(**param))
                 return [self.nice(prop, x) for x in f(**kw)]
+            return foo
+        found = self.find_field("GET", prop)
+        if found:
+            print >> sys.stderr, '__getattr__:', found
+            found = found[0]
+            param = self.prepare_param()
+            param['field'] = prop
+            def foo():
+                f = theApp.GET(found["path"].realize(**param))
+                return [self.nice(prop, x) for x in f()]
             return foo
         raise Exception("Bad Field %s for %s "%(path, self.__klass__))
 
@@ -160,7 +166,7 @@ def init(keyfile, secretfile):
             theApp = AppConnection(f.read().strip(), g.read().strip())
 
     for name, path in objnames.items():
-        p = type(name, (TrelloProxy, ), dict(path=path, name=name))
+        p = type(name, (TrelloProxy, ), dict(_path=path, _name=name))
         p.availables = p.build(process(name))
         TrelloProxy.register(p)
 
@@ -173,7 +179,12 @@ if __name__  == "__main__":
         print k
     xs = theBoard.lists()
     print xs
-    print xs[1].cards()
+    ys = xs[1].cards()
+    print ys
+    y = ys[0]
+    print 'a card', y
+    print 'due', y.due()
+    print 'name', y.name()
 
 
 
