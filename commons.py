@@ -7,6 +7,7 @@ objnames = {
     "board": "boards",
     "card": "cards",
     "checklist": "checklists",
+    "list": "lists",
     "member": "members",
     "notification": "notifications",
     "organaization": "organaizations",

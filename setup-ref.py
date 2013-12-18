@@ -14,6 +14,7 @@ for name in objnames:
     print "got ", got.url
     print got.headers
     with file(os.path.join(dirname, name+".html"), 'w') as f:
-        f.write(got.content.encode("utf8"))
+        f.write(got.content)
+        #f.write(got.content.encode("utf8"))
 
 
