@@ -34,11 +34,11 @@ class TestPathSpec(unittest.TestCase):
     def test_realize1(self):
         self.assertEqual('/1/boards/123/members/345', self.ps1.realize(idBoard='123', idMember='345'))
 
-    def test_function_name(self):
-        self.assertEqual('cards', self.ps.function_name)
+    def test_prop_name(self):
+        self.assertEqual('cards', self.ps.prop_name)
 
-    def test_function_name1(self):
-        self.assertEqual('members', self.ps1.function_name)
+    def test_prop_name1(self):
+        self.assertEqual('members', self.ps1.prop_name)
 
 
 if __name__ == "__main__":
