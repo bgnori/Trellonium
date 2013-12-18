@@ -12,14 +12,15 @@ from parsehtml import process
 
 
 class AppConnection:
-    urlwversion= "https://api.trello.com/1/"
+    url = "https://api.trello.com"
+    version = "1"
     def __init__(self, key, secret, token=None):
         self.key = key
         self.secret = secret
         self.token = token
 
     def token_url(self, app_name, expiration='30days', write_access=True):
-        url = self.urlwversion + "/".join(["authorize"])
+        url = "/".join([self.url, self.version, "authorize"])
         params = dict(key=self.key,
                 name=app_name,
                 expiration=expiration,
@@ -28,17 +29,21 @@ class AppConnection:
         req = requests.Request(method='GET', url=url, params=params)
         return req.full_url
 
-    def GET(self, *paths):
+    def GET(self, path):
         def f(**kw):
-            url = self.urlwversion + "/".join(paths)
+            url = self.url + path
             params = dict(key=self.key, **kw)
             got = requests.get(url, params=params)
+            print got.url
+            if got.status_code != 200:
+                print got.status_code
+                return None
             return json.loads(got.content)
         return f
 
     def POST(self, *paths):
         def f(**kw):
-            url = self.urlwversion + "/".join(paths)
+            url = self.url + path
             params = dict(key=self.key, token=self.token, **kw)
             got = requests.post(url, params=params)
             return got
@@ -47,7 +52,7 @@ class AppConnection:
 
     def PUT(self, *paths):
         def f(value):
-            url = self.urlwversion + "/".join(paths)
+            url = self.url + path
             params = dict(key=self.key, token=self.token, value=value)
             got = requests.put(url, params=params)
             return json.loads(got.content)
@@ -59,6 +64,7 @@ theApp = None
 
 class TrelloProxy(object):
     fields = set([])
+    availables = {}
     _by_name = {}
     _by_path = {}
 
@@ -72,16 +78,12 @@ class TrelloProxy(object):
     def build(source):
         rs = dict(GET={}, PUT={}, DELETE={}, POST={})
         for s in source:
-            self.buildone(rs, s)
+            xs = rs[s["method"]].get(s["prop_name"], None)
+            if xs is None:
+                xs = []
+            xs.append(s)
+            rs[s["method"]][s["prop_name"]] = xs
         return rs
-
-    @staticmethod
-    def _buildone(rs, d):
-        xs = rs[d["method"]].get(d["entity"], None)
-        if xs is None:
-            xs = []
-        xs.append(d["params"])
-        rs[d["method"]][d["entity"]] = xs
 
     @classmethod
     def register(kls, subk):
@@ -94,7 +96,18 @@ class TrelloProxy(object):
 
     @classmethod
     def find_by_path(kls, path):
-        return kls._by_path[subk.path]
+        print path
+        print kls._by_path
+        return kls._by_path[path]
+
+    @classmethod
+    def nice(kls, txt, x):
+        try:
+            k = kls.find_by_path(txt)
+            print k
+            return k(x['id'])
+        except KeyError:
+            return x
 
     @classmethod
     def create(kls, **kw):
@@ -103,26 +116,31 @@ class TrelloProxy(object):
         x = json.loads(got.content)
         return kls(x['id'])  #FIXME Need to cache other fields.
 
-    def validate(self, method, path):
+    def find(self, method, prop):
         m = self.availables[method]
-        try:
-            return path in m
-        except:
-            if '[field]' not in m:
-                return False
-            return path in self.fields
+        xs = m.get(prop, None)
+        if xs:
+            return xs
+        if '[field]' in m:
+            return m['[field]'].get(prop, None)
+        return None
 
-    def __getattr__(self, path):
-        if self.validate("GET", path):
+    def prepare_param(self):
+        d = {}
+        d['id' + self.name.capitalize()] = self.idstr
+        return d
+
+    def __getattr__(self, prop):
+        found = self.find("GET", prop)
+        if found:
+            shortest = min(found, key=lambda x: len(x['path'].frags))
+            print shortest
+            param = self.prepare_param()
             def foo(**kw):
-                f = theApp.GET(self.__class__.path, self.idstr, path)
-                return [self.find_by_path(path)(x['id']) for x in f(**kw)]
+                f = theApp.GET(shortest["path"].realize(**param))
+                return [self.nice(prop, x) for x in f(**kw)]
             return foo
-        elif '[field]' in self.availables["GET"]:
-            if path in self.fields:
-                return theApp.GET(self.__class__.path, self.idstr, path)
-            else:
-                raise "Bad Field %s for %s "%(path, self.__klass__)
+        raise Exception("Bad Field %s for %s "%(path, self.__klass__))
 
     def __setattr__(self, path, value):
         if self.validate("PUT", path):
@@ -135,7 +153,6 @@ class TrelloProxy(object):
                 raise
 
 
-
 def init(keyfile, secretfile):
     global theApp
     with file(keyfile, "r") as f:
@@ -144,6 +161,7 @@ def init(keyfile, secretfile):
 
     for name, path in objnames.items():
         p = type(name, (TrelloProxy, ), dict(path=path, name=name))
+        p.availables = p.build(process(name))
         TrelloProxy.register(p)
 
 if __name__  == "__main__":
@@ -151,7 +169,11 @@ if __name__  == "__main__":
     theApp.token = file("/home/nori/Desktop/work/Trellonium/token.txt").read().split()
     theBoard = TrelloProxy.find_by_name("board")("52a113d948daf8a31e0043dd")
     print theBoard
-
+    for k, v in theBoard.availables['GET'].items():
+        print k
+    xs = theBoard.lists()
+    print xs
+    print xs[1].cards()
 
 
 
