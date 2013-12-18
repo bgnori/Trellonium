@@ -3,12 +3,14 @@
 import re
 
 class PathFrag(object):
-    def __repr__(self):
-        return "<PathFrag%s>"%(self.path_text)
+    pass
 
 class PathFragText(PathFrag):
     def __init__(self, t):
         self.t = t
+    def __repr__(self):
+        return "<PathFragText: %s>"%(self.t)
+    
     def realize(self, **kw):
         return self.t
 
@@ -21,6 +23,9 @@ class PathFragVariable(PathFrag):
                 assert len(y) == 2
                 y = [y[1], y[0].capitalize()]
             self.ts.append(''.join(y))
+
+    def __repr__(self):
+        return "<PathFragVariable: %s>"%(self.ts)
 
     def realize(self, **kw):
         for t in self.ts:
@@ -52,6 +57,9 @@ class PathSpec(object):
 
     @property
     def prop_name(self):
-        return self.frags[4].realize()
+        if len(self.frags) < 5:
+            return "[field]"
+        else:
+            return self.frags[4].realize()
 
 
