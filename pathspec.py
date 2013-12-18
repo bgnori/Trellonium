@@ -68,6 +68,5 @@ class PathSpec(object):
         if len(self.frags) < 5:
             return "[field]"
         else:
-            return self.frags[4].realize()
-
+            return self.frags[4].realize(field='[field]')
 
