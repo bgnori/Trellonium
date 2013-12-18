@@ -12,8 +12,7 @@ class Handler(object):
         self.name = name
 
     def handle(self, t):
-        for found in self.handle_root(t):
-            print found
+        return [found for found in self.handle_root(t)]
 
     def handle_root(self, t):
         for n in t.xpath("//div[@id=$id]/div", id=self.name):
@@ -29,10 +28,7 @@ class Handler(object):
         for m in node.xpath('ul/li[strong/text()="Required permissions:"]/text()'):
             d["permission_text"] = m
         for m in node.xpath('ul/li[strong/text()="Arguments"]'):
-            d["argument"] = self.handle_argument(m)
-        #for m in n.xpath("ul/li/ul/li"):
-        #    print m.text
-        print d
+            d["Arguments"] = self.handle_argument(m)
         return d
 
     def handle_argument(self, node):
@@ -60,11 +56,15 @@ def process(name):
     with file(os.path.join(dirname, name+".html"), 'r') as f:
         p = etree.HTMLParser()
         t = etree.parse(f, p)
-        h.handle(t)
+        return h.handle(t)
 
 
 if __name__  == "__main__":
-    process("card")
+    for found in process("board"):
+        print found['id']
+        if 'Arguments' in found:
+            for k, v in found['Arguments'].iteritems():
+                print '   ', k, v
     
     for name in objnames:
         pass
