@@ -50,5 +50,8 @@ class PathSpec(object):
     def realize(self, **kw):
         return "/".join(frag.realize(**kw) for frag in self.frags)
 
+    @property
+    def method_name(self):
+        return self.frags[4].realize()
 
 
